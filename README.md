@@ -1,4 +1,4 @@
-# Bid Doc Fill
+# Bid Docx Fill
 
 一句话总结：这是一个面向 DeerFlow/Codex 的 Word 标书自动回填 skill，用程序解析 `.doc/.docx` 文档，识别后半部分待填写位置，从前文或知识库中匹配值，并在原 Word 文件中原位写回。
 

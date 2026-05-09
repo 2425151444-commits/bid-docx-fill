@@ -1,0 +1,16 @@
+interface:
+  display_name: "标书自动回填"
+  short_description: "基于原始 Word 文档识别待填项并原位回填，不重写整份文档。"
+  default_prompt: >
+    使用 $bid-doc-fill 时，优先运行
+    python3 /mnt/skills/custom/bid-doc-fill/scripts/deerflow_entry.py，
+    让脚本直接处理用户上传的原始 Word 文件并输出到 /mnt/user-data/outputs。
+    不要先把 Word 转成 Markdown 再重建文档，不要让模型直接重写整份合同或标书。
+    任务应按多步 workflow 执行：先解析 docx 结构，再高召回识别待填项，再匹配前文与知识库值，最后程序化原位写回。
+    在待填项识别阶段，不要把范围收得过窄；宁可先把可疑候选项收入统一 field mapping table，再在后续阶段依靠证据、置信度和人工复核策略筛选。
+    对表格，不要只按“左标签右空白”理解，还要检查“上标签下空白”、“一行多字段”、“一列多字段”、“单元格内段落锚点”以及“行列交叉定义的空白单元格”。
+    对类似 （采购代理机构名称） 的锚点，不要默认值一定在后侧；应同时检查前后两侧的下划线、点线、长空格、引号空白等槽位，若前后都存在则默认优先后侧。
+    只有当 /mnt/user-data/outputs 中存在 final_output.docx、result.json、manual_review.json 时，才算任务成功；否则应视为失败并回到脚本链路排查。
+
+policy:
+  allow_implicit_invocation: true

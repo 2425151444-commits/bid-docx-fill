@@ -2,42 +2,38 @@
 
 一句话总结：这是一个面向 DeerFlow/Codex 的 Word 标书自动回填 skill，用程序解析 `.doc/.docx` 文档，识别后半部分待填写位置，从前文或知识库中匹配值，并在原 Word 文件中原位写回。
 
-## 这个项目是什么
+## What This Project Is
 
-`bid-docx-fill` 解决的是一类很常见的工程问题：
+`bid-docx-fill` solves a very common engineering problem:A user uploads a bid document, response document, contract template, or similar Word document. The first half of the document usually contains factual information such as the project name, supplier name, contact details, address, and amount. The latter half usually contains many underlines, empty tables, blank parentheses, or signature/seal areas, and these need to be filled automatically with information from earlier in the document.
+This project does not ask a large language model to rewrite the entire Word document. Instead, it follows a more stable engineering workflow:
+1. Parse the original Word structure.
+2. Determine the actual scope of the response-file template that needs to be filled.
+3. Use rules to identify fields that need to be filled.
+4. Match candidate values from the preceding content in the uploaded document and from the local knowledge base.
+5. Perform local XML write-back inside the original `.docx`, preserving the format as much as possible.
+6. Output auditable JSON, Markdown, and the final Word file.
 
-用户上传一份标书、响应文件、合同模板或类似 Word 文档，文档前半部分通常包含项目名称、供应商名称、联系方式、地址、金额等事实信息；文档后半部分通常包含很多下划线、空表格、括号空白或签章区域，需要把前面的信息自动填进去。
+## Why It Is Needed
 
-这个项目不是让大模型重写整份 Word，而是走一个更稳定的工程流程：
+If a model is asked to generate a new Word document directly, three problems can easily occur:
 
-1. 解析原始 Word 结构。
-2. 判断真正需要填写的响应文件模板范围。
-3. 用规则识别待填写字段。
-4. 从上传文档前文和本地知识库中匹配候选值。
-5. 在原 `.docx` 内做局部 XML 写回，尽量保持格式不变。
-6. 输出可审计的 JSON、Markdown 和最终 Word 文件。
+-The original formatting, tables, fonts, and layout may be damaged.
+-Field sources may be untraceable, making later manual review difficult.
+-The model may invent values, creating a high-risk outcome.
 
-## 为什么需要它
+The core idea of this project is that the model or Agent is responsible for understanding and orchestration, while scripts handle deterministic parsing, matching, and write-back. In an Agent system, it belongs to the “tool execution layer / Skill layer”; it is not a pure chat response and not merely RAG retrieval.
 
-如果直接让模型生成一份新的 Word，容易出现三个问题：
+## Features
 
-- 原文格式、表格、字体和排版被破坏。
-- 字段来源不可追踪，后续不好人工复核。
-- 模型可能凭空补值，风险很高。
+- Supports `.docx` input. For `.doc`, it will attempt conversion through Wordconv or LibreOffice.
+- Automatically identifies fillable regions such as response-file formats, qualification response documents, and commercial response documents.
+- Identifies common fillable items such as underlines, empty parentheses, empty table cells, and row/column anchors.
+- Prioritizes values from the preceding content in the uploaded document, then uses `assets/data/knowledge-base.xlsx` as a fallback knowledge base.
+- Applies different styles to written values from different sources, making manual inspection easier.
+- Preserves `manual_review.json`; low-confidence fields, signatures, handwritten signatures, and uncertain fields will not be silently filled with arbitrary values.
+- Generates `final_response.md` and a field mapping table so that the Agent can display the results directly in the conversation.
 
-本项目的核心思路是：模型或 Agent 负责理解和编排，脚本负责确定性解析、匹配和写回。放在 Agent 系统里，它属于“工具执行层 / Skill 层”，不是纯聊天回答，也不是单纯 RAG 检索。
-
-## 功能特性
-
-- 支持 `.docx` 输入，`.doc` 会尝试通过 Wordconv 或 LibreOffice 转换。
-- 自动识别响应文件格式、资格性响应文件、商务响应文件等可填写区域。
-- 识别下划线、空括号、表格空单元格、行列锚点等常见待填项。
-- 从上传文档前文优先取值，再使用 `assets/data/knowledge-base.xlsx` 作为兜底知识库。
-- 对不同来源的写入值使用不同样式，方便人工检查。
-- 保留 `manual_review.json`，低置信度、签字签名、无法确定的字段不会静默乱填。
-- 生成 `final_response.md` 和字段映射表，方便 Agent 在对话中直接展示结果。
-
-## 目录结构
+## Directory Structure
 
 ```text
 bid-docx-fill/
@@ -71,70 +67,70 @@ bid-docx-fill/
     check_regression_targets.py
 ```
 
-关键文件说明：
+Key file descriptions：
 
-- `SKILL.md`：给 Codex/DeerFlow 读取的 skill 使用说明。
-- `scripts/deerflow_entry.py`：DeerFlow 环境下的稳定入口。
-- `scripts/main.py`：本地命令行端到端入口。
-- `scripts/parse_docx_v2.py`：解析 Word 段落、表格、单元格结构。
-- `scripts/scope_detector.py`：定位真正的响应文件模板区。
-- `scripts/extract_fields_v4.py`：识别待填写字段。
-- `scripts/resolve_values_v3.py`：从文档前文和知识库中匹配字段值。
-- `scripts/fill_docx_inplace_v3.py`：在原 `.docx` 中局部写回。
-- `assets/data/knowledge-base.xlsx`：企业或供应商固定信息知识库。
-- `assets/data/classification-table.xlsx`： benchmark / 字段定义数据。
+- `SKILL.md`: Usage instructions for Codex/DeerFlow to read this skill.
+- `scripts/deerflow_entry.py`: A stable entry point for the DeerFlow environment.
+- `scripts/main.py`: Local command-line end-to-end entry point.
+- `scripts/parse_docx_v2.py`: Parses Word paragraphs, tables, and cell structures.
+- `scripts/scope_detector.py`: Locates the actual response-file template section.Note that sparse query is currently used; you need to modify the corresponding contract headings to constrain the range of blanks.
+- `scripts/extract_fields_v4.py`: Identifies fields that need to be filled.
+- `scripts/resolve_values_v3.py`: Matches field values from the document prefix and the knowledge base.
+- `scripts/fill_docx_inplace_v3.py`: Performs local write-back inside the original `.docx`.
+- `assets/data/knowledge-base.xlsx`: Fixed enterprise or supplier information knowledge base.
+- `assets/data/classification-table.xlsx`: Benchmark / field definition data.
 
-## 环境要求
+## Environment Requirements
 
-建议使用 Python 3.10 或更高版本。
+Python 3.10 or later is recommended.
 
-安装依赖：
+Install dependencies:：
 
 ```bash
 pip install -r requirements.txt
 ```
 
-当前依赖很轻：
+The current dependency set is lightweight:：
 
-- `lxml`：处理 Word 内部 OOXML。
-- `openpyxl`：读取知识库 Excel。
+- `lxml`： Processes Word internal OOXML.
+- `openpyxl`：Reads the knowledge-base Excel file.
 
-如果要处理老式 `.doc` 文件，还需要额外满足其一：
+If you need to process legacy `.doc` files, one of the following additional requirements must be met:
 
-- Windows 环境安装 Microsoft Word Converter / Wordconv。
-- Linux 或 macOS 环境安装 LibreOffice，并保证 `soffice` 可用。
+- Install Microsoft Word Converter / Wordconv in a Windows environment.
+- Install LibreOffice in a Linux or macOS environment and ensure that `soffice` is available.
 
-如果只处理 `.docx`，不需要额外转换工具。
+If you only process `.docx` files, no additional conversion tool is required.
 
-## 快速开始
+## Quick Start
 
-本地运行：
+Run locally:
 
 ```bash
 python scripts/main.py --input-doc path/to/input.docx --output-dir outputs --no-save-to-desktop
 ```
 
-Windows 示例：
+Windows example:
 
 ```powershell
 python scripts\main.py --input-doc .\demo\input.docx --output-dir .\outputs --no-save-to-desktop
 ```
 
-查看参数：
+View parameters:
 
 ```bash
 python scripts/main.py --help
 ```
 
-## DeerFlow / Codex 调用方式
+## DeerFlow / Codex Invocation Method
 
-在 DeerFlow skill 环境中，推荐调用稳定 wrapper：
+In a DeerFlow skill environment, it is recommended to call the stable wrapper:
 
 ```bash
 python3 /mnt/skills/custom/bid-doc-fill/scripts/deerflow_entry.py --output-dir /mnt/user-data/outputs
 ```
 
-如果用户明确上传了某个文件：
+If the user has explicitly uploaded a specific file:
 
 ```bash
 python3 /mnt/skills/custom/bid-doc-fill/scripts/deerflow_entry.py \
@@ -142,16 +138,16 @@ python3 /mnt/skills/custom/bid-doc-fill/scripts/deerflow_entry.py \
   --output-dir /mnt/user-data/outputs
 ```
 
-`deerflow_entry.py` 会做几件事：
+`deerflow_entry.py` performs several steps:
 
-1. 从 `/mnt/user-data/uploads` 选择最新 Word 文件。
-2. 调用 `scripts/main.py` 执行完整处理流程。
-3. 确认输出目录中存在必需产物。
-4. 在 stdout 中返回结构化 JSON，方便上层 Agent 展示和挂载文件。
+1. Selects the latest Word file from `/mnt/user-data/uploads`.
+2. Calls `scripts/main.py` to execute the complete processing workflow.
+3. Verifies that required artifacts exist in the output directory.
+4. Returns structured JSON in stdout, making it easier for the upper-layer Agent to display and mount files.
 
-## 输出文件
+## Output Files
 
-运行成功后，输出目录通常包含：
+After a successful run, the output directory usually contains:
 
 ```text
 outputs/
@@ -165,79 +161,79 @@ outputs/
   scope_detection_report.json
 ```
 
-核心产物：
+Core artifacts:
 
-- `final_output.docx`：最终回填后的 Word 文件。
-- `result.json`：整体运行状态、字段数量、分组信息。
-- `manual_review.json`：需要人工复核的字段。
-- `final_response.md`：适合直接展示给用户的总结。
-- `field_mapping_table.*`：字段、候选值、来源、置信度、写回状态。
-- `scope_detection_report.json`：响应模板范围识别报告。
+- `final_output.docx`: The final Word file after backfilling.
+- `result.json`: Overall run status, number of fields, and grouping information.
+- `manual_review.json`: Fields requiring manual review.
+- `final_response.md`: A summary suitable for direct display to the user.
+- `field_mapping_table.*`: Fields, candidate values, sources, confidence, and write-back status.
+- `scope_detection_report.json`: Response-template scope detection report.
 
-## 知识库格式
+## Knowledge Base Format
 
-默认知识库路径：
+Default knowledge-base path:
 
 ```text
 assets/data/knowledge-base.xlsx
 ```
 
-脚本会读取第一个 worksheet。表头需要包含字段列和值列。
+The script reads the first worksheet. The header row must contain a field column and a value column. 
 
-字段列支持这些表头之一：
+The field column supports one of the following headers:
 
-- `具体填写项`
-- `字段名`
-- `项目`
+- `Specific fill item` (`具体填写项`)
+- `Field name` (`字段名`)
+- `Item` (`项目`)
 
-值列支持这些表头之一：
+The value column supports one of the following headers:
 
-- `备注`
-- `字段值`
-- `值`
-- `内容`
+- `Remarks` (`备注`)
+- `Field value` (`字段值`)
+- `Value` (`值`)
+- `Content` (`内容`)
 
-最小示例：
+Minimal example:
 
-| 具体填写项 | 备注 |
+| Specific fill item | Remarks |
 | --- | --- |
 | 供应商名称 | 某某科技有限公司 |
 | 法定代表人 | 张三 |
 | 联系电话 | 010-12345678 |
 | 地址 | 北京市海淀区示例路 1 号 |
 
-## 工作流程
+## Workflow
 
 ```text
-Word 输入
-  -> parse_docx_v2.py 解析文档结构
-  -> scope_detector.py 定位待填写模板范围
-  -> extract_fields_v4.py 识别待填写字段
-  -> classify_source_v3.py 判断字段优先来源
-  -> resolve_values_v3.py 匹配上传文档和知识库值
-  -> fill_docx_inplace_v3.py 原位写回 Word
-  -> 输出 final_output.docx 和审计报告
+Word input
+  -> parse_docx_v2.py parses the document structure
+  -> scope_detector.py locates the template range to be filled
+  -> extract_fields_v4.py identifies fields that need to be filled
+  -> classify_source_v3.py determines each field's preferred source
+  -> resolve_values_v3.py matches values from the uploaded document and knowledge base
+  -> fill_docx_inplace_v3.py writes back into the Word file in place
+  -> output final_output.docx and audit reports
 ```
 
-在 Agent 项目中，可以把它理解为一个“确定性工具链”：
+In an Agent project, it can be understood as a “deterministic toolchain”:
 
-- Agent 负责任务编排和向用户解释结果。
-- 脚本负责 Word 解析、字段定位、证据记录和写回。
-- 知识库负责提供企业固定信息。
+-The Agent is responsible for task orchestration and explaining results to the user.
+-The scripts are responsible for Word parsing, field positioning, evidence recording, and write-back.
+-The knowledge base is responsible for providing fixed enterprise information.
 
-## 常见问题
+## FAQ
 
-### 1. 运行时报 `Knowledge base file does not exist`
+### 1.  Runtime error: `Knowledge base file does not exist`
 
-本质：默认知识库文件不存在，或者路径传错了。
+Cause: The default knowledge-base file does not exist, or the path is incorrect.
 
-排查：
+Troubleshooting:
 
-1. 确认 `assets/data/knowledge-base.xlsx` 是否存在。
-2. 如果使用自定义知识库，确认 `--kb-file` 指向真实路径。
-3. 确认 Excel 文件没有被 WPS 或 Office 独占锁定。
+1. Confirm whether `assets/data/knowledge-base.xlsx` exists.
+2. If using a custom knowledge base, confirm that `--kb-file` points to a real path.
+3. Confirm that the Excel file is not locked by WPS or Office.
 
-解决：
+Solution:
 
 ```bash
 python scripts/main.py \
@@ -246,63 +242,63 @@ python scripts/main.py \
   --output-dir outputs
 ```
 
-### 2. `.doc` 文件无法转换
+### 2. `.doc` file cannot be converted
 
-本质：`.doc` 是旧版 Word 二进制格式，不能像 `.docx` 一样直接解析 OOXML。
+Cause: `.doc` is an old Word binary format and cannot be parsed directly as OOXML like `.docx`.
 
-排查：
+Troubleshooting:
 
-1. Windows 上确认是否存在 `Wordconv.exe`。
-2. Linux/macOS 上确认 `soffice --version` 是否可执行。
-3. 优先让用户上传 `.docx`。
+1. On Windows, confirm whether `Wordconv.exe` exists.
+2. On Linux/macOS, confirm whether `soffice --version` is executable.
+3. Prefer asking the user to upload a `.docx` file.
 
-解决：把 `.doc` 另存为 `.docx` 后再运行。
+Solution: Save the `.doc` file as `.docx` and then rerun the workflow.
 
-### 3. 识别字段很少或没有自动填写
+### 3. Very few fields are detected or no automatic filling occurs
 
-本质：脚本没有找到可信的“响应文件模板区”，或者字段置信度不足。
+Cause: The script did not find a reliable “response-file template section,” or field confidence is insufficient.
 
-排查：
+Troubleshooting:
 
-1. 查看 `scope_detection_report.json`，确认范围起点是否正确。
-2. 查看 `field_mapping_table.md`，确认字段是否被识别。
-3. 查看 `manual_review.json`，确认是否被标记为人工复核。
+1. Check `scope_detection_report.json` to confirm whether the range start is correct.
+2. Check `field_mapping_table.md` to confirm whether fields were detected.
+3. Check `manual_review.json` to confirm whether fields were marked for manual review.
+   
+Solution: Optimize document section headings, supplement the knowledge base, or extend heading signals in `scope_detector.py`.
 
-解决：优化文档章节标题、补充知识库，或在代码中扩展 `scope_detector.py` 的标题信号。
+### 4. Abnormal formatting in the final Word file
 
-### 4. 最终 Word 格式异常
+Cause: The Word document structure may be complex, such as nested tables, text boxes, comments, headers/footers, or special controls.
 
-本质：Word 文档结构可能比较复杂，比如嵌套表格、文本框、批注、页眉页脚或特殊控件。
+Troubleshooting:
 
-排查：
+1. Confirm that the input is a standard `.docx` file.
+2. Check whether complex tables or text boxes are present.
+3. Use `--writeback-mode safe` to prioritize format preservation.
 
-1. 确认输入是否是标准 `.docx`。
-2. 查看是否存在复杂表格或文本框。
-3. 使用 `--writeback-mode safe` 优先保护格式。
-
-解决：
+Solution:
 
 ```bash
 python scripts/main.py --input-doc path/to/input.docx --output-dir outputs --writeback-mode safe
 ```
 
-## 当前限制
+## Current Limitations
 
-- 主要支持 `.docx`，`.doc` 依赖外部转换工具。
-- 暂不重点支持 PDF、扫描件、OCR。
-- 暂不覆盖所有复杂 Word 元素，例如文本框、页眉页脚、批注、修订痕迹。
-- 对极复杂嵌套表格只做有限支持。
-- 签字、签名类字段默认更偏人工复核，不建议自动生成。
+- Mainly supports `.docx`; `.doc` depends on external conversion tools.
+- Does not currently focus on PDF, scanned files, or OCR.
+- Does not yet cover all complex Word elements, such as text boxes, headers/footers, comments, and tracked changes.
+- Provides only limited support for highly complex nested tables.
+- Signature and handwritten-signature fields default to manual review and should not be automatically generated.
 
-## 上传 GitHub 前的注意事项
+## Notes Before Uploading to GitHub
 
-这个项目包含 `assets/data/*.xlsx`，其中可能有企业固定信息、联系人、地址、账号等业务数据。公开上传前请确认：
+This project contains `assets/data/*.xlsx`, which may include business data such as fixed enterprise information, contacts, addresses, and account details. Before public upload, confirm the following:
 
-1. `knowledge-base.xlsx` 是否含敏感信息。
-2. `classification-table.xlsx` 是否包含真实客户或项目数据。
-3. `outputs/`、`sample-run-*`、`__pycache__/`、临时 Word 文件是否已经清理。
-
-建议 `.gitignore` 至少包含：
+1. Whether `knowledge-base.xlsx` contains sensitive information.
+2. Whether `classification-table.xlsx` contains real customer or project data.
+3. Whether `outputs/`, `sample-run-*`, `__pycache__/`, and temporary Word files have been cleaned up.
+   
+The recommended `.gitignore` should include at least:
 
 ```gitignore
 __pycache__/
@@ -312,12 +308,12 @@ outputs/
 ~$*
 ```
 
-## 适合继续优化的方向
+## Suitable Directions for Further Optimization
 
-- 增加单元测试和回归测试样例。
-- 把字段规则配置化，减少硬编码。
-- 增加更多 Word 模板的 benchmark。
-- 为知识库增加脱敏示例文件。
-- 增加 CI 检查，确保入口脚本和依赖安装正常。
+- Add unit tests and regression test examples.
+- Make field rules configurable to reduce hardcoding.
+- Add benchmarks for more Word templates.
+- Provide anonymized sample files for the knowledge base.
+- Add CI checks to ensure that entry scripts and dependency installation work correctly.
 
 
